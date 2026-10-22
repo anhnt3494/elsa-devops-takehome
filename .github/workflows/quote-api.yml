@@ -86,7 +86,10 @@ jobs:
         env:
           TAG: ${{ github.sha }}
         run: |
-          yq -i '.image.tag = strenv(TAG)' charts/quote-api/values.yaml
+          # sed rather than `yq -i`: yq drops blank lines and turns a one-line
+          # bump into a reformat of the whole file.
+          sed -i "/^image:/,/^[^ ]/ s|^  tag: .*|  tag: ${TAG}|" charts/quote-api/values.yaml
+          [ "$(yq '.image.tag' charts/quote-api/values.yaml)" = "$TAG" ]
           if git diff --quiet; then
             echo "chart already at $TAG"
             exit 0
