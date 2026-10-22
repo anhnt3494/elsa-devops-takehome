@@ -1,0 +1,120 @@
+name: elsa-devops
+
+x-k3s-node: &k3s-node
+  image: rancher/k3s:${K3S_VERSION:-v1.36.5-k3s1}
+  privileged: true
+  restart: unless-stopped
+  tmpfs:
+    - /run
+    - /var/run
+  ulimits:
+    nproc: 65535
+    nofile:
+      soft: 65535
+      hard: 65535
+
+x-k3s-agent: &k3s-agent
+  <<: *k3s-node
+  depends_on:
+    server:
+      condition: service_started
+  environment:
+    K3S_URL: https://server:6443
+    K3S_TOKEN_FILE: /token/token
+
+services:
+  token-init:
+    image: busybox:1.36
+    command: ["sh", "-c", "[ -s /token/token ] || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \\n' > /token/token"]
+    volumes:
+      - k3s-token:/token
+
+  server:
+    <<: *k3s-node
+    hostname: server
+    command:
+      - server
+      - --node-name=server
+      - --token-file=/token/token
+      - --tls-san=server
+      - --tls-san=localhost
+      - --write-kubeconfig=/output/kubeconfig.yaml
+      - --write-kubeconfig-mode=644
+    depends_on:
+      token-init:
+        condition: service_completed_successfully
+    volumes:
+      - k3s-token:/token:ro
+      - k3s-server:/var/lib/rancher/k3s
+      - kubeconfig:/output
+    ports:
+      - "${API_PORT:-6443}:6443"
+      - "${HTTP_PORT:-8080}:80"
+
+  agent-1:
+    <<: *k3s-agent
+    hostname: agent-1
+    command: ["agent", "--node-name=agent-1"]
+    volumes:
+      - k3s-token:/token:ro
+      - agent-1:/var/lib/rancher/k3s
+      - agent-1-etc:/etc/rancher/node
+
+  agent-2:
+    <<: *k3s-agent
+    hostname: agent-2
+    command: ["agent", "--node-name=agent-2"]
+    volumes:
+      - k3s-token:/token:ro
+      - agent-2:/var/lib/rancher/k3s
+      - agent-2-etc:/etc/rancher/node
+
+  agent-3:
+    <<: *k3s-agent
+    hostname: agent-3
+    command: ["agent", "--node-name=agent-3"]
+    volumes:
+      - k3s-token:/token:ro
+      - agent-3:/var/lib/rancher/k3s
+      - agent-3-etc:/etc/rancher/node
+
+  agent-4:
+    <<: *k3s-agent
+    hostname: agent-4
+    command: ["agent", "--node-name=agent-4"]
+    volumes:
+      - k3s-token:/token:ro
+      - agent-4:/var/lib/rancher/k3s
+      - agent-4-etc:/etc/rancher/node
+
+  toolbox: &toolbox
+    image: ghcr.io/anhnt3494/devops-toolbox:${TOOLBOX_TAG:-dev}
+    build: ./toolbox
+    pull_policy: missing
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_started
+    environment:
+      IN_TOOLBOX: "1"
+    volumes:
+      - .:/workspace
+      - kubeconfig:/kube:ro
+
+  bootstrap:
+    <<: *toolbox
+    restart: on-failure
+    command: ["/workspace/scripts/00-bootstrap.sh"]
+
+volumes:
+  k3s-token:
+  k3s-server:
+  kubeconfig:
+  agent-1:
+  agent-1-etc:
+  agent-2:
+  agent-2-etc:
+  agent-3:
+  agent-3-etc:
+  agent-4:
+  agent-4-etc:
