@@ -1,6 +1,6 @@
 image:
   repository: ghcr.io/anhnt3494/quote-api
-  tag: c915b0a28519e0095366146a49246469ca4cc93a
+  tag: cfdcefa54c7097cdf84d8428b21930d4f419baa2
   pullPolicy: IfNotPresent
 
 containerPort: 8080
