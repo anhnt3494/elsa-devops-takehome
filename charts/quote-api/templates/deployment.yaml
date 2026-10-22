@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "quote-api.name" . }}
+  labels:
+    {{- include "quote-api.labels" . | nindent 4 }}
+spec:
+  # Initial size only: afterwards the HPA owns replicas and the Argo CD
+  # Application ignores /spec/replicas (see argocd/quote-api-app.yaml).
+  replicas: {{ .Values.autoscaling.minReplicas }}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{- include "quote-api.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "quote-api.labels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.containerPort | quote }}
+        prometheus.io/path: /metrics
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.placement }}
+      affinity:
+        nodeAffinity:
+          # Hard rule: only the spot / on-demand pools (never GPU or control-plane).
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: {{ .capacityLabel }}
+                    operator: In
+                    values: {{ toJson .allowedCapacities }}
+          # Soft rule: cost first, spot wins the scoring.
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: {{ .spotWeight }}
+              preference:
+                matchExpressions:
+                  - key: {{ .capacityLabel }}
+                    operator: In
+                    values: [spot]
+            - weight: {{ .onDemandWeight }}
+              preference:
+                matchExpressions:
+                  - key: {{ .capacityLabel }}
+                    operator: In
+                    values: [on-demand]
+      topologySpreadConstraints:
+        # Availability guarantee: spot and on-demand are two domains; with
+        # maxSkew 1 neither may be empty while the other holds 2+ replicas, so
+        # >= 1 replica always lands on on-demand. nodeTaintsPolicy: Honor drops
+        # cordoned/tainted nodes from the domain count, so losing the only
+        # on-demand node degrades to spot-only instead of leaving pods Pending.
+        - topologyKey: {{ .capacityLabel }}
+          maxSkew: {{ .capacityMaxSkew }}
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: Honor
+          labelSelector:
+            matchLabels:
+              {{- include "quote-api.selectorLabels" $ | nindent 14 }}
+          matchLabelKeys: [pod-template-hash]
+        # Best effort: one replica per node, but never block rescheduling.
+        - topologyKey: kubernetes.io/hostname
+          maxSkew: 1
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "quote-api.selectorLabels" $ | nindent 14 }}
+          matchLabelKeys: [pod-template-hash]
+      {{- end }}
+      containers:
+        - name: quote-api
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: PORT
+              value: {{ .Values.containerPort | quote }}
+            - name: SHUTDOWN_GRACE_SECONDS
+              value: {{ .Values.shutdownGraceSeconds | quote }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 1
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]

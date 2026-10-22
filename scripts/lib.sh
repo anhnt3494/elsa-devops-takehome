@@ -15,9 +15,13 @@ if [ -z "${IN_TOOLBOX:-}" ]; then
     "/workspace/scripts/$(basename "${BASH_SOURCE[1]}")" "$@"
 fi
 
-REPO=/workspace
-APP_NS=quote-api
-ARGOCD_NS=argocd
+# Read by the scripts that source this file.
+# shellcheck disable=SC2034
+{
+  REPO=/workspace
+  APP_NS=quote-api
+  ARGOCD_NS=argocd
+}
 
 log()  { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 ok()   { printf '\033[1;32m✔ %s\033[0m\n' "$*"; }

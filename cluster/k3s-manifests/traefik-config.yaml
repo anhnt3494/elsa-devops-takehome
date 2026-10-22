@@ -1,0 +1,11 @@
+# Keep the ingress controller on the control-plane ("system") node so that
+# draining a spot node in the reclaim drill never takes the ingress down.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    nodeSelector:
+      node-role.kubernetes.io/control-plane: "true"

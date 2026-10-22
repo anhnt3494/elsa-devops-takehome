@@ -46,6 +46,7 @@ services:
     volumes:
       - k3s-token:/token:ro
       - k3s-server:/var/lib/rancher/k3s
+      - ./cluster/k3s-manifests/traefik-config.yaml:/var/lib/rancher/k3s/server/manifests/traefik-config.yaml:ro
       - kubeconfig:/output
     ports:
       - "${API_PORT:-6443}:6443"
@@ -97,6 +98,7 @@ services:
         condition: service_started
     environment:
       IN_TOOLBOX: "1"
+      HTTP_PORT: ${HTTP_PORT:-8080}
     volumes:
       - .:/workspace
       - kubeconfig:/kube:ro

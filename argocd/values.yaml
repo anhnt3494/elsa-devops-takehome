@@ -1,0 +1,21 @@
+global:
+  domain: argocd.localhost
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: "true"
+
+configs:
+  params:
+    server.insecure: true
+  cm:
+    timeout.reconciliation: 60s
+
+server:
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+
+dex:
+  enabled: false
+
+notifications:
+  enabled: false

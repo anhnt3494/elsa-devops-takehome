@@ -1,0 +1,41 @@
+image:
+  repository: ghcr.io/anhnt3494/quote-api
+  tag: 45534e93548a3a11f73a1e891ae718fd40fde51b
+  pullPolicy: IfNotPresent
+
+containerPort: 8080
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 64Mi
+  limits:
+    cpu: "1"
+    memory: 128Mi
+
+autoscaling:
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+pdb:
+  maxUnavailable: 1
+
+placement:
+  capacityLabel: acme.io/capacity
+  allowedCapacities: [spot, on-demand]
+  spotWeight: 100
+  onDemandWeight: 10
+  capacityMaxSkew: 1
+
+service:
+  port: 80
+
+ingress:
+  enabled: true
+  className: traefik
+  host: ""
+  path: /
+
+terminationGracePeriodSeconds: 30
+shutdownGraceSeconds: 5

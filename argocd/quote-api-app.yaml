@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quote-api
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/anhnt3494/elsa-devops-takehome.git
+    targetRevision: main
+    path: charts/quote-api
+    helm:
+      releaseName: quote-api
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: quote-api
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: quote-api
+      jsonPointers:
+        - /spec/replicas
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 2m
