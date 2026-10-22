@@ -11,7 +11,7 @@ helm upgrade --install argocd argo/argo-cd \
   --namespace "$ARGOCD_NS" --create-namespace \
   --version "$ARGOCD_CHART_VERSION" \
   --values "$REPO/argocd/values.yaml" \
-  --wait --timeout 10m
+  --wait --timeout 10m --hide-notes
 ok "Argo CD ready"
 
 log "Registering the quote-api Application"
