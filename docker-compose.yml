@@ -88,7 +88,7 @@ services:
       - agent-4-etc:/etc/rancher/node
 
   toolbox: &toolbox
-    image: ghcr.io/anhnt3494/devops-toolbox:${TOOLBOX_TAG:-dev}
+    image: ghcr.io/anhnt3494/devops-toolbox:${TOOLBOX_TAG:-1.0.0}
     build: ./toolbox
     pull_policy: missing
     restart: unless-stopped
