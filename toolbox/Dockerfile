@@ -6,7 +6,6 @@ ARG HELM_VERSION=v3.22.1
 ARG TERRAFORM_VERSION=1.16.7
 ARG K6_VERSION=v1.8.2
 ARG KUBECONFORM_VERSION=v0.8.0
-ARG ARGOCD_VERSION=v3.5.6
 RUN apk add --no-cache curl unzip \
  && printf 'fail\nsilent\nshow-error\nlocation\nretry = 5\nretry-all-errors\n' > /root/.curlrc
 WORKDIR /out
@@ -25,8 +24,7 @@ RUN set -eux -o pipefail; \
       | tar -xz --strip-components=1 "k6-${K6_VERSION}-linux-${TARGETARCH}/k6"; \
     curl "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-${TARGETARCH}.tar.gz" \
       | tar -xz kubeconform; \
-    curl -o argocd "https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_VERSION}/argocd-linux-${TARGETARCH}"; \
-    chmod +x kubectl helm terraform k6 kubeconform argocd; \
+    chmod +x kubectl helm terraform k6 kubeconform; \
     rm -f ./*.tar.gz ./*.zip
 
 FROM alpine:3.24
