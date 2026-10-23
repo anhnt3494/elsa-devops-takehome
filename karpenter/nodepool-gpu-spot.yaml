@@ -1,0 +1,60 @@
+# Preferred GPU capacity: spot. weight 100 > on-demand's 10, so Karpenter
+# tries this pool first and falls back to gpu-on-demand only when no spot
+# offering in the allowed families/AZs can be launched.
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: gpu-spot
+spec:
+  weight: 100
+  template:
+    metadata:
+      labels:
+        acme.io/node-type: gpu
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: gpu
+      taints:
+        - key: nvidia.com/gpu
+          effect: NoSchedule
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: [spot]
+        - key: karpenter.k8s.aws/instance-gpu-manufacturer
+          operator: In
+          values: [nvidia]
+        # Three single-GPU families widen the spot pools Karpenter can pick
+        # from (price-capacity-optimized), which is what keeps spot viable.
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values: [g5, g6, g6e]
+        - key: karpenter.k8s.aws/instance-gpu-count
+          operator: In
+          values: ["1"]
+        - key: kubernetes.io/arch
+          operator: In
+          values: [amd64]
+      expireAfter: 720h
+      # Upper bound for draining a node (expiry/drift). Pods get their own
+      # terminationGracePeriodSeconds to finish in-flight requests first.
+      terminationGracePeriod: 1h
+  disruption:
+    # Only remove nodes with no inference pods left. Karpenter never evicts a
+    # running inference pod to repack GPU nodes.
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 10m
+    budgets:
+      - nodes: "20%"
+      # No AMI/config drift replacement during business hours
+      # (01:00-15:00 UTC = 08:00-22:00 ICT).
+      - nodes: "0"
+        reasons: [Drifted]
+        schedule: "0 1 * * *"
+        duration: 14h
+  limits:
+    nvidia.com/gpu: "16"
+    cpu: "256"
+    memory: 1024Gi

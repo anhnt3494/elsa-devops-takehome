@@ -1,0 +1,67 @@
+# Pod side of the contract: how an inference service lands on these pools
+# and survives disruption without dropping requests.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llm-inference
+  namespace: inference
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: llm-inference
+  template:
+    metadata:
+      labels:
+        app: llm-inference
+    spec:
+      nodeSelector:
+        acme.io/node-type: gpu
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      topologySpreadConstraints:
+        - topologyKey: topology.kubernetes.io/zone
+          maxSkew: 1
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: llm-inference
+      # Longest request we serve + margin. A spot notice gives 2 minutes, so
+      # requests are capped below that at the API layer.
+      terminationGracePeriodSeconds: 110
+      containers:
+        - name: server
+          image: ghcr.io/acme/inference-server:1.0.0
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 2
+          lifecycle:
+            # Leave time for endpoints to drop this pod before SIGTERM.
+            preStop:
+              sleep:
+                seconds: 10
+          resources:
+            requests:
+              cpu: "3"
+              memory: 14Gi
+            limits:
+              nvidia.com/gpu: 1
+              memory: 14Gi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: llm-inference
+  namespace: inference
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: llm-inference

@@ -1,0 +1,61 @@
+# Fallback GPU capacity: on-demand, used only when gpu-spot cannot launch.
+# Tighter limits cap what a spot shortage can cost.
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: gpu-on-demand
+spec:
+  weight: 10
+  template:
+    metadata:
+      labels:
+        acme.io/node-type: gpu
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: gpu
+      taints:
+        - key: nvidia.com/gpu
+          effect: NoSchedule
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: [on-demand]
+        - key: karpenter.k8s.aws/instance-gpu-manufacturer
+          operator: In
+          values: [nvidia]
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values: [g5, g6, g6e]
+        - key: karpenter.k8s.aws/instance-gpu-count
+          operator: In
+          values: ["1"]
+        - key: kubernetes.io/arch
+          operator: In
+          values: [amd64]
+      expireAfter: 720h
+      terminationGracePeriod: 1h
+  disruption:
+    # Unlike gpu-spot, this pool may consolidate underutilized nodes, which
+    # is how fallback capacity moves back to spot once spot is available
+    # again. That move evicts pods, so it is only allowed in a nightly
+    # low-traffic window: the budget below blocks Underutilized for the other
+    # 22h (02:00-04:00 ICT = 19:00-21:00 UTC stays open). Empty nodes are
+    # removed at any time.
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 10m
+    budgets:
+      - nodes: "20%"
+      - nodes: "0"
+        reasons: [Underutilized]
+        schedule: "0 21 * * *"
+        duration: 22h
+      - nodes: "0"
+        reasons: [Drifted]
+        schedule: "0 1 * * *"
+        duration: 14h
+  limits:
+    nvidia.com/gpu: "4"
+    cpu: "64"
+    memory: 256Gi

@@ -1,0 +1,39 @@
+# Karpenter v1.15 (karpenter.k8s.aws/v1). Shared by both GPU NodePools.
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: gpu
+spec:
+  # Pinned EKS-optimized AL2023 release, never `latest` in production: AMI
+  # bumps go through dev/stag first, then this line changes (Karpenter rolls
+  # nodes via drift, inside the NodePool drift budgets). The al2023 alias
+  # resolves the NVIDIA variant (driver + container toolkit) for GPU types.
+  amiSelectorTerms:
+    - alias: al2023@v20261019
+  role: KarpenterNodeRole-quote-prod
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: quote-prod
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: quote-prod
+  # g5/g6/g6e ship local NVMe: RAID0 it for containerd and ephemeral storage,
+  # so multi-GB inference images and model caches don't pull onto EBS.
+  instanceStorePolicy: RAID0
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 50Gi
+        volumeType: gp3
+        encrypted: true
+        deleteOnTermination: true
+  # IMDSv2 only, hop limit 1: pods cannot reach node credentials; workloads
+  # get AWS access through EKS Pod Identity instead.
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpTokens: required
+    httpPutResponseHopLimit: 1
+  tags:
+    team: ml-platform
+    workload: gpu-inference
