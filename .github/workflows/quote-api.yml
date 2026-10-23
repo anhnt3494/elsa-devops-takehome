@@ -74,7 +74,7 @@ jobs:
   # GITHUB_TOKEN do not trigger workflows, so this cannot loop.
   bump-chart:
     needs: image
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
