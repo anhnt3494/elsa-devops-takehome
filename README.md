@@ -27,9 +27,9 @@ curl http://localhost:8080/api/quote
 
 `run-all.sh` waits for the cluster, deploys the app through Argo CD, runs the
 spot-reclaim drill, fixes and verifies the troubleshooting namespace, and
-validates the Terraform and Karpenter code. From a fresh clone with nothing
-cached it took ~15 minutes on my connection, most of it image downloads (the
-toolbox image, k3s, Argo CD, nginx). Every script is idempotent; run any of them again, or one by one.
+validates the Terraform and Karpenter code. Measured on a fresh clone with no
+images cached: `compose up` 2 min, `run-all.sh` 9 min (mostly image pulls); a
+second `run-all.sh` on the same cluster takes about a minute. Every script is idempotent; run any of them again, or one by one.
 `docker compose down -v` removes everything.
 
 | Part | Where |
